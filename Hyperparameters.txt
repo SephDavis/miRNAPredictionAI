@@ -1,0 +1,25 @@
+In the given code, there are several hyperparameters that define the structure and behavior of the model. 
+
+Let's go through each of them:
+
+sequence_length: This hyperparameter defines the length of the input sequences that the model will receive. 
+In this case, the model processes sequences of length 50 nucleotides. Each input sequence is a 50-nucleotide-long continuous subsequence from the original FASTA file.
+
+num_hidden_units: This hyperparameter specifies the number of hidden units (also known as memory cells) in each of the LSTM layers. 
+In this case, each LSTM layer has 128 hidden units. 
+The more hidden units, the more complex patterns the model can learn, but at the cost of increased computational complexity.
+
+num_output_units: This hyperparameter specifies the number of output units in the final Dense layer of the model. 
+Since the problem is a binary classification task (predicting whether a sequence induces RNAi or not), there is only one output unit with a sigmoid activation function,
+which produces a probability value between 0 and 1.
+
+batch_size: This hyperparameter defines the number of samples used for a single update of the model's weights during training. 
+In this case, the batch size is 32. A smaller batch size can result in a more accurate estimate of the gradient, but at the cost of increased training time. 
+Conversely, a larger batch size can speed up training but may produce a less accurate gradient estimate.
+
+num_epochs: This hyperparameter represents the number of times the model iterates over the entire dataset during training. 
+In this case, the model trains for 10 epochs. 
+The more epochs, the more the model can learn from the data, but there is a risk of overfitting if the number of epochs is too high.
+
+These hyperparameters are essential for tuning the performance of the model. 
+Depending on the complexity of the data and the problem, you may need to experiment with different hyperparameter values to achieve the best performance.
