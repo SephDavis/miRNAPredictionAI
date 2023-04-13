@@ -1,10 +1,13 @@
 import numpy as np
 from keras.models import Sequential
 from keras.layers import LSTM, Dense, Bidirectional
-from keras.preprocessing.sequence import pad_sequences
+from keras.utils import pad_sequences
 from keras.preprocessing.text import Tokenizer
 from sklearn.model_selection import train_test_split
 import sys
+import os
+import time
+
 
 # Define parameters
 sequence_length = 50
@@ -17,8 +20,8 @@ num_epochs = 10
 beam_width = 10
 
 # Load data
-precursor_fasta = "precursor_sequences.fas"
-x_chromosome_fasta = "x_chromosome_sequence.fa"
+precursor_fasta = "RatPrecursormiRNAs.fas"
+x_chromosome_fasta = "RatXChromosomeUnmasked.fas"
 
 # Tokenize sequences
 tokenizer = Tokenizer(char_level=True)
@@ -27,21 +30,29 @@ with open(precursor_fasta) as f:
 tokenizer.fit_on_texts(data)
 
 # Encode sequences
-def load_fasta(filename):
+def load_fasta(filename, as_string=False):
+    sequences = []
     with open(filename) as f:
-        f.readline()  # Skip header line
-        sequence = f.read().replace('\n', '')
-    return tokenizer.texts_to_sequences([sequence])[0]
+        for line in f:
+            if not line.startswith('>'):
+                sequence = line.strip()
+                sequences.append(tokenizer.texts_to_sequences([sequence])[0])
+    if as_string:
+        return sum(sequences, [])
+    return sequences
 
 precursor_seq = load_fasta(precursor_fasta)
-x_chromosome_seq = load_fasta(x_chromosome_fasta)
+x_chromosome_seq = load_fasta(x_chromosome_fasta, as_string=True)
+
+# Combine X chromosome sequences into a single sequence
+x_chromosome_seq = list(np.concatenate(x_chromosome_seq))
 
 # Pad sequences
 def pad_sequence(seq, max_len):
     return pad_sequences([seq], maxlen=max_len, padding='post', truncating='post')[0]
 
-input_data = pad_sequence(precursor_seq, sequence_length)
-x_chromosome_seq = pad_sequence(x_chromosome_seq, sequence_length)
+input_data = [pad_sequence(seq, sequence_length) for seq in precursor_seq]
+x_chromosome_seq = x_chromosome_seq
 
 # Define bidirectional LSTM model
 model = Sequential()
@@ -56,31 +67,48 @@ model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy']
 
 # Prepare data for training
 x_train = np.array(input_data).reshape(-1, sequence_length, 1)
-y_train = np.array([1] * len(input_data))
+y_train = np.ones((len(input_data), 1))
+
+# Split data into training and validation sets
+x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.2, random_state=42)
 
 # Train model
-model.fit(x_train, y_train, batch_size=batch_size, epochs=num_epochs)
+history = model.fit(x_train, y_train, validation_data=(x_val, y_val), batch_size=batch_size, epochs=num_epochs, verbose=1)
 
-# Function to implement Beam search
-def beam_search(predictions, beam_width):
-    sequences = [[]]
-    for prediction in predictions:
-        all_candidates = []
-        for seq in sequences:
-            for idx, value in enumerate(prediction):
-                new_seq = seq.copy()
-                new_seq.append((idx, value))
-                all_candidates.append(new_seq)
+# Print training history
+for i in range(len(history.history['loss'])):
+    print(f"Epoch {i+1}/{num_epochs}")
+    print(f"loss: {history.history['loss'][i]:.4f} - accuracy: {history.history['accuracy'][i]:.4f} - val_loss: {history.history['val_loss'][i]:.4f} - val_accuracy: {history.history['val_accuracy'][i]:.4f}")
+# Threshold for predicted probabilities
+threshold = 0.5
 
-        ordered = sorted(all_candidates, key=lambda x: x[-1][1], reverse=True)
-        sequences = ordered[:beam_width]
+# Generate predictions
 
-    return [seq[:-1] for seq in sequences]
+predictions = []
+for i in range(0, len(x_chromosome_seq) - sequence_length + 1):
+    window = x_chromosome_seq[i:i + sequence_length]
+    window_np = np.array(window).reshape(1, -1, 1)
+    window_prediction = model.predict(window_np, verbose=1)
+    if window_prediction > threshold:
+        predictions.append((i, window_prediction))
 
-# Predict new miRNA sequences
-predictions = model.predict(np.array(x_chromosome_seq).reshape(-1, sequence_length, 1))
-beam_search_results = beam_search(predictions, beam_width)
+# Identify potential miRNA precursor sequences
+predicted_sequences = []
+for i, pred in enumerate(predictions):
+    if pred > threshold:
+        start = i
+        end = i + sequence_length
+        seq = x_chromosome_seq[start:end]
+        decoded_sequence = tokenizer.sequences_to_texts([seq])[0]
+        predicted_sequences.append(decoded_sequence)
 
-print("Predicted miRNA sequences:")
-for seq in beam_search_results:
-    print(tokenizer.sequences_to_texts([seq])[0])
+# Print top predicted miRNA precursor sequences
+print("Predicted miRNA precursor sequences:")
+for idx, seq in enumerate(predicted_sequences):
+    print(f"Sequence {idx + 1}: {seq}")
+
+# Save predicted sequences to a text file
+with open("predicted_miRNA_precursors.txt", "w") as output_file:
+    for idx, seq in enumerate(predicted_sequences):
+        output_file.write(f"Sequence {idx + 1}: {seq}\n")
+
