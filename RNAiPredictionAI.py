@@ -14,7 +14,7 @@ sequence_length = 50
 num_hidden_units = 128
 num_output_units = 6  # One output unit for each RNA base (A, C, G, U, T, N)
 batch_size = 32
-num_epochs = 63
+num_epochs = 24
 
 # Load data
 precursor_fasta = "RatPrecursormiRNAs.fas"
