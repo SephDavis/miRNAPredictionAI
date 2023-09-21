@@ -24,4 +24,4 @@ Here's a breakdown of how the program works:
 
 12. Save the predicted sequences to a text file and print a confirmation message.
 
-By following these steps, the program trains a deep learning model to predict potential miRNA precursor sequences in the X chromosome using precursor miRNA sequences as training data.
+By following these steps, the program trains a deep learning model to predict potential miRNA precursor sequences in the X chromosome using precursor miRNA sequences as training data. It should be noted that this program can work with any set of miRNA molecules for prediction across any chromosome.
